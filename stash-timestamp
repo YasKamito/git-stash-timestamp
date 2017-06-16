@@ -1,0 +1,92 @@
+#!/usr/bin/perl -w
+use strict;
+use File::Path;
+
+my $file = ".gittimestamp.csv";
+my $csv_data = ();
+my @filestat = ();
+my $atime_sec = ();
+my $mtime_sec = ();
+my $atime_l = ();
+my $mtime_l = ();
+
+my %ls_mod = ();
+my %csv_hash = ();
+
+if ($ENV{GIT_DIR}) {
+	chdir($ENV{GIT_DIR}) or die $!;
+}
+
+# Move to git root directory
+my $gitdir;
+open my $rs, "git rev-parse --git-dir |";
+my @rlist = <$rs>;
+close $rs;
+$gitdir = join '', @rlist;
+$gitdir =~ s/(\r\n|\r|\n)$//;
+if ($gitdir) {
+	chdir($gitdir);
+	chdir("../");
+}
+
+# hashing csv file, if already exists.
+if (-e $file) {
+	open IN, $file
+	  or die "Cannot open $file: $!";
+	while (<IN>) {
+		chomp;
+		my ($csv_filename, 
+			$csv_mtime_sec,
+			$csv_mtime_l) = split(/,/, $_, 3);
+		$csv_hash{$csv_filename} = [$csv_mtime_sec,
+									$csv_mtime_l];
+	}
+	close IN;
+}
+
+# Retrieve files that have been cached in Git but have changed but have not been staged.
+$/ = "\0";
+open FM, 'git ls-files -m -z|' or die $!;
+while (<FM>) {
+	chomp;
+	$ls_mod{$_} = $_;
+}
+close FM;
+
+# Save the file update timestamp list in cached Master directory to CSV in Git.
+# However, it does not change the file update timestamp of the unchanged but unstaged.
+open FH, 'git ls-files -z|' or die $!;
+open FP, ">" . $file or die "Can't Open File.\n";
+while (<FH>) {
+	chomp;
+#	if (/^source\/|^config\/|^db\//) {
+		if (exists($ls_mod{$_})){
+			if (exists($csv_hash{$_})){
+				$csv_data = $csv_hash{$_};
+				$mtime_sec = $csv_data->[0];
+				$mtime_l = $csv_data->[1];
+			} else {
+				next;
+			}
+		} else {
+			@filestat = stat $_;
+			$mtime_sec = $filestat[9];
+			$mtime_l = localtime($filestat[9]);
+			# If it already exists in the csv file and the error is within 1 second, use as it is.(Support for FAT file system)
+			if (exists($csv_hash{$_})){
+				$csv_data = $csv_hash{$_};
+				if (abs($mtime_sec - $csv_data->[0]) <= 1){
+					$csv_data = $csv_hash{$_};
+					$mtime_sec = $csv_data->[0];
+					$mtime_l = $csv_data->[1];
+				}
+			}
+		}
+		print FP $_, ",";
+		print FP $mtime_sec, ",";
+		print FP $mtime_l, "\n";
+#	}
+}
+close FP;
+close FH;
+

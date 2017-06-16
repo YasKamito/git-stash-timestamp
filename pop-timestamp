@@ -1,0 +1,56 @@
+#!/usr/bin/perl -w
+use strict;
+
+my $file = ".gittimestamp.csv";
+
+my @filestat = ();
+my $file_path;
+my $atime_sec;
+my $mtime_sec;
+
+my %ls_mod = ();
+
+if ($ENV{GIT_DIR}) {
+	chdir($ENV{GIT_DIR}) or die $!;
+}
+
+# Move to git root directory.
+my $gitdir;
+open my $rs, "git rev-parse --git-dir |";
+my @rlist = <$rs>;
+close $rs;
+$gitdir = join '', @rlist;
+$gitdir =~ s/(\r\n|\r|\n)$//;
+if ($gitdir) {
+	chdir($gitdir);
+	chdir("../");
+}
+
+# Retrieve files that have been cached in Git but have changed but have not been staged.
+$/ = "\0";
+open FM, 'git ls-files -m -z|' or die $!;
+while (<FM>) {
+	chomp;
+	$ls_mod{$_} = $_;
+}
+close FM;
+
+# Restore file's timestamp based on CSV file.
+# However, it does not change the file update timestamp of the unchanged but unstaged
+$/ = "\n";
+open IN, $file
+  or die "Cannot open $file: $!";
+while (<IN>) {
+	chomp;
+	@filestat = split(/,/);
+	$file_path = $filestat[0];
+	$mtime_sec = $filestat[1];
+	if (exists($ls_mod{$file_path})){
+		next;
+	}
+	utime $mtime_sec, $mtime_sec, $file_path;
+	#print $atime_sec, $mtime_sec, $file_path, "\n";
+}
+
+close IN;
+

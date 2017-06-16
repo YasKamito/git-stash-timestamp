@@ -1,0 +1,104 @@
+#!/bin/bash
+#set -x
+
+## return value
+RC_OK=0
+RC_ERROR=1
+RC_CANCEL=2
+RC_KEYNOTFOUND=3
+
+set_to_postcommit()
+{
+	cat << 'EOF'
+#!/bin/sh
+
+unset GIT_DIR
+
+cd `git rev-parse --git-dir`
+cd ..
+
+echo 'Start post-commit'
+
+RESULT=`git status -s .gittimestamp.csv | wc -l`
+
+if [ 0 -ne ${RESULT} ]
+then
+	git add .gittimestamp.csv
+	git commit --amend -C HEAD --no-verify
+fi
+
+exit 0
+EOF
+}
+
+set_to_precommit()
+{
+	cat << 'EOF'
+#!/bin/sh
+
+unset GIT_DIR
+
+echo 'Start pre-commit'
+
+exec stash-timestamp
+
+exit 0
+EOF
+}
+
+set_to_checkout()
+{
+	cat << 'EOF'
+#!/bin/sh
+
+unset GIT_DIR
+
+echo 'Start pop-timestamp'
+
+exec pop-timestamp
+
+exit 0
+EOF
+}
+
+
+###############################
+# MAIN
+###############################
+if [ ! -e .git ]; then
+    echo "git repository not exists"
+    exit ${RX_ERROR}
+fi
+
+
+# Add script to git hooks
+if [ -e ./.git/hooks/post-commit ]; then
+	echo "post-commit file is already exists"
+else
+	echo "Create git-hook [post-commit]"
+	set_to_postcommit > ./.git/hooks/post-commit
+fi
+
+if [ -e ./.git/hooks/pre-commit ]; then
+	echo "pre-commit file is already exists"
+else
+	echo "Create git-hook [pre-commit]"
+	set_to_precommit > ./.git/hooks/pre-commit
+fi
+
+if [ -e ./.git/hooks/post-checkout ]; then
+	echo "post-checkout file is already exists"
+else
+	echo "Create git-hook [post-checkout]"
+	set_to_checkout > ./.git/hooks/post-checkout
+fi
+
+if [ -e ./.git/hooks/post-merge ]; then
+	echo "post-merge file is already exists"
+else
+	echo "Create git-hook [post-merge]"
+	set_to_checkout > ./.git/hooks/post-merge
+fi
+
+exit ${RC_OK}
+
