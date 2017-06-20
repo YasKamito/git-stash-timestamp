@@ -4,8 +4,6 @@
 ## return value
 RC_OK=0
 RC_ERROR=1
-RC_CANCEL=2
-RC_KEYNOTFOUND=3
 
 set_to_postcommit()
 {
@@ -67,7 +65,7 @@ EOF
 ###############################
 if [ ! -e .git ]; then
     echo "git repository not exists"
-    exit ${RX_ERROR}
+    exit ${RC_ERROR}
 fi
 
 
