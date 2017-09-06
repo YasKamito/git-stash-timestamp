@@ -1,6 +1,6 @@
 # git-stash-timestamp
 
-A script for stocking the file update date in the CSV file and restoring it when the file update date is updated by GIT
+A script for stocking the file timestamp in the CSV file and restoring it when the timestamp is updated.
 
 
 ## Features
